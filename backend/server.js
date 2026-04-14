@@ -15,9 +15,11 @@ dotenv.config();
 // ─────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", FRONTEND_URL],
     methods: ["GET", "POST"],
   },
 });
@@ -25,7 +27,11 @@ const io = new Server(server, {
 // ─────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", FRONTEND_URL],
+  }),
+);
 app.use(express.json());
 
 // ─────────────────────────────────────────
