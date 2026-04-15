@@ -449,12 +449,13 @@ const Dashboard = () => {
   return (
     <div
       style={{
-        height: "100vh",
+        height: "100svh",
         width: "100vw",
         overflow: "hidden",
         background: "#030712",
         display: "flex",
         flexDirection: "column",
+        maxHeight: "100svh",
       }}
     >
       <Toaster position="top-center" />
@@ -677,6 +678,7 @@ const Dashboard = () => {
           flex: 1,
           overflow: "hidden",
           minHeight: 0,
+          maxHeight: "calc(100svh - 65px - 60px - 52px - 48px)",
           position: "relative",
         }}
       >
@@ -684,7 +686,10 @@ const Dashboard = () => {
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             display: mobileTab === "map" ? "flex" : "none",
             padding: "8px",
           }}
@@ -696,6 +701,7 @@ const Dashboard = () => {
               borderRadius: "12px",
               border: "1px solid #1e293b",
               overflow: "hidden",
+              maxHeight: "100%",
             }}
           >
             <BorderMap
@@ -789,9 +795,12 @@ const Dashboard = () => {
           background: "#0f172a",
           borderTop: "2px solid #1e293b",
           flexShrink: 0,
+          height: "65px",
           minHeight: "65px",
+          maxHeight: "65px",
           width: "100%",
-          position: "relative",
+          position: "sticky",
+          bottom: 0,
           zIndex: 9999,
         }}
       >
