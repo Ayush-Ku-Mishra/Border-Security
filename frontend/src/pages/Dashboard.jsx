@@ -782,15 +782,17 @@ const Dashboard = () => {
       </div>
 
       {/* MOBILE: BOTTOM NAV */}
-      <div
+      <nav
         style={{
-          display: "flex",
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
           background: "#0f172a",
-          borderTop: "1px solid #1e293b",
+          borderTop: "2px solid #1e293b",
           flexShrink: 0,
-          height: "60px",
-          minHeight: "60px",
+          minHeight: "65px",
           width: "100%",
+          position: "relative",
+          zIndex: 9999,
         }}
       >
         {[
@@ -803,44 +805,60 @@ const Dashboard = () => {
             key={key}
             onClick={() => setMobileTab(key)}
             style={{
-              flex: 1,
               background: mobileTab === key ? "#1e293b" : "transparent",
               color: mobileTab === key ? "white" : "#64748b",
               border: "none",
               borderTop:
                 mobileTab === key
-                  ? "2px solid #3b82f6"
-                  : "2px solid transparent",
-              padding: "0",
-              height: "100%",
+                  ? "3px solid #3b82f6"
+                  : "3px solid transparent",
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "2px",
+              justifyContent: "center",
+              gap: "3px",
+              padding: "8px 4px",
+              width: "100%",
+              height: "100%",
             }}
           >
-            <span style={{ fontSize: "18px" }}>{icon}</span>
-            <span style={{ fontSize: "9px", fontWeight: "bold" }}>
-              {label}
-              {key === "alerts" && detections.length > 0 && (
-                <span
-                  style={{
-                    background: "#dc2626",
-                    color: "white",
-                    fontSize: "8px",
-                    padding: "0 4px",
-                    borderRadius: "999px",
-                    marginLeft: "3px",
-                  }}
-                >
-                  {detections.length}
-                </span>
-              )}
+            <span
+              style={{
+                fontSize: "20px",
+                lineHeight: "1",
+              }}
+            >
+              {icon}
             </span>
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: "600",
+                lineHeight: "1",
+              }}
+            >
+              {label}
+            </span>
+            {key === "alerts" && detections.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "6px",
+                  background: "#dc2626",
+                  color: "white",
+                  fontSize: "8px",
+                  padding: "1px 5px",
+                  borderRadius: "999px",
+                  fontWeight: "bold",
+                }}
+              >
+                {detections.length}
+              </span>
+            )}
           </button>
         ))}
-      </div>
+      </nav>
     </div>
   );
 };

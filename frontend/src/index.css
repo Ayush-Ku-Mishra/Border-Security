@@ -67,3 +67,10 @@ body,
     transform: scale(1.2);
   }
 }
+
+/* Fix mobile nav always visible */
+@supports (-webkit-touch-callout: none) {
+  .mobile-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
