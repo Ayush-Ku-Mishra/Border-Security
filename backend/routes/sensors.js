@@ -9,7 +9,9 @@ const PYTHON_API = process.env.PYTHON_API || "http://localhost:8000";
 // ─────────────────────────────────────────
 router.get("/", async (req, res) => {
   try {
-    const pythonRes = await axios.get(`${PYTHON_API}/sensors`);
+    const pythonRes = await axios.get(`${PYTHON_API}/sensors`, {
+      timeout: 30000,
+    });
     const sensors = pythonRes.data.sensors;
     res.json({ success: true, count: sensors.length, sensors });
   } catch (err) {
@@ -22,7 +24,9 @@ router.get("/", async (req, res) => {
 // ─────────────────────────────────────────
 router.get("/:id", async (req, res) => {
   try {
-    const pythonRes = await axios.get(`${PYTHON_API}/sensors`);
+    const pythonRes = await axios.get(`${PYTHON_API}/sensors`, {
+      timeout: 30000,
+    });
     const sensors = pythonRes.data.sensors;
     const sensor = sensors.find((s) => s.id === req.params.id);
 

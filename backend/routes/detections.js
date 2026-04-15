@@ -26,7 +26,9 @@ router.get("/", async (req, res) => {
 // ─────────────────────────────────────────
 router.get("/live", async (req, res) => {
   try {
-    const pythonRes = await axios.get(`${PYTHON_API}/detect`);
+    const pythonRes = await axios.get(`${PYTHON_API}/detect`, {
+      timeout: 30000,
+    });
     const raw = pythonRes.data;
 
     const detection = new Detection({
@@ -59,9 +61,10 @@ router.get("/live", async (req, res) => {
 router.get("/simulate", async (req, res) => {
   try {
     const results = [];
-
     for (let i = 0; i < 3; i++) {
-      const pythonRes = await axios.get(`${PYTHON_API}/detect/${i}`);
+      const pythonRes = await axios.get(`${PYTHON_API}/detect/${i}`, {
+        timeout: 30000,
+      });
       const raw = pythonRes.data;
 
       const detection = new Detection({

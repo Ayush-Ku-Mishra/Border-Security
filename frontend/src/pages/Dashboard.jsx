@@ -678,7 +678,6 @@ const Dashboard = () => {
           overflow: "hidden",
           minHeight: 0,
           position: "relative",
-          maxHeight: "calc(100vh - 185px)",
         }}
       >
         {/* MAP TAB */}
@@ -789,6 +788,9 @@ const Dashboard = () => {
           background: "#0f172a",
           borderTop: "1px solid #1e293b",
           flexShrink: 0,
+          height: "60px",
+          minHeight: "60px",
+          width: "100%",
         }}
       >
         {[
@@ -809,7 +811,8 @@ const Dashboard = () => {
                 mobileTab === key
                   ? "2px solid #3b82f6"
                   : "2px solid transparent",
-              padding: "8px 4px",
+              padding: "0",
+              height: "100%",
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
