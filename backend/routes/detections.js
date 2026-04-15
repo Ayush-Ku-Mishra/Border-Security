@@ -121,4 +121,43 @@ router.delete("/", async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────
+// GET /api/geocode
+// Proxy for Nominatim reverse geocoding
+// Fixes CORS issue in production
+// ─────────────────────────────────────────
+router.get("/geocode", async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.json({ place: "Border Zone" });
+    }
+
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse`,
+      {
+        params: { lat, lon: lng, format: "json" },
+        headers: {
+          "User-Agent": "BorderSecuritySystem/1.0",
+        },
+      },
+    );
+
+    const addr = response.data.address || {};
+    const place =
+      addr.village ||
+      addr.town ||
+      addr.suburb ||
+      addr.county ||
+      addr.state_district ||
+      addr.state ||
+      "Border Zone";
+
+    res.json({ place });
+  } catch {
+    res.json({ place: "Border Zone" });
+  }
+});
+
 export default router;

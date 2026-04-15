@@ -71,21 +71,10 @@ const getDirection = (lat1, lng1, lat2, lng2) => {
 // ─────────────────────────────────────────
 const reverseGeocode = async (lat, lng) => {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse` +
-        `?lat=${lat}&lng=${lng}&format=json`,
-    );
+    const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const res = await fetch(`${BASE}/detections/geocode?lat=${lat}&lng=${lng}`);
     const data = await res.json();
-    const addr = data.address;
-    return (
-      addr.village ||
-      addr.town ||
-      addr.suburb ||
-      addr.county ||
-      addr.state_district ||
-      addr.state ||
-      "Border Zone"
-    );
+    return data.place || "Border Zone";
   } catch {
     return "Border Zone";
   }
@@ -439,18 +428,31 @@ const BorderMap = ({ detections, sensors, lastDetection }) => {
             icon={sensorIcon(SENSOR_NAMES[sensor.id] || sensor.id)}
           >
             <Popup>
-              <div>
-                <p>
-                  <b style={{ color: "#06b6d4" }}>
-                    {SENSOR_NAMES[sensor.id] || sensor.id}
-                  </b>
+              <div style={{ fontFamily: "sans-serif", fontSize: "13px" }}>
+                <p
+                  style={{
+                    color: "#06b6d4",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  📡 {SENSOR_NAMES[sensor.id] || sensor.id}
                 </p>
-                <p>ID: {sensor.id}</p>
-                <p>Status: {sensor.status}</p>
-                <p>Battery: {sensor.battery}%</p>
-                <p>Signal: {sensor.signal} dBm</p>
-                <p style={{ fontSize: "11px", color: "#888" }}>
-                  {sensor.lat.toFixed(4)}, {sensor.lng.toFixed(4)}
+                <hr style={{ margin: "4px 0", opacity: 0.2 }} />
+                <p>
+                  <b>Status:</b> {sensor.status}
+                </p>
+                <p>
+                  <b>Battery:</b> {sensor.battery}%
+                </p>
+                <p>
+                  <b>Signal:</b> {sensor.signal} dBm
+                </p>
+                <p
+                  style={{ fontSize: "11px", color: "#888", marginTop: "4px" }}
+                >
+                  📍 {sensor.lat.toFixed(4)}, {sensor.lng.toFixed(4)}
                 </p>
               </div>
             </Popup>

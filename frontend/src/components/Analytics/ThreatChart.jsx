@@ -14,7 +14,21 @@ const COLORS = {
   Unknown: "#6b7280",
 };
 
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return isMobile;
+};
+
+import { useState, useEffect } from "react";
+
 const ThreatChart = ({ detections }) => {
+  const isMobile = useIsMobile();
+
   const counts = detections.reduce((acc, det) => {
     const act = det.activity || "Unknown";
     acc[act] = (acc[act] || 0) + 1;
@@ -26,13 +40,38 @@ const ThreatChart = ({ detections }) => {
     value,
   }));
 
+  // Bigger radius on mobile
+  const innerR = isMobile ? 55 : 30;
+  const outerR = isMobile ? 90 : 50;
+
   if (data.length === 0) {
     return (
-      <div className="h-full flex flex-col">
-        <h2 className="text-white font-bold text-xs mb-1">📊 ACTIVITY</h2>
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <div
-          className="flex-1 flex items-center
-          justify-center text-gray-500 text-xs"
+          style={{
+            color: "white",
+            fontWeight: "bold",
+            fontSize: "11px",
+            marginBottom: "6px",
+          }}
+        >
+          📊 ACTIVITY
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#6b7280",
+            fontSize: "12px",
+          }}
         >
           No data yet
         </div>
@@ -41,19 +80,33 @@ const ThreatChart = ({ detections }) => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <h2 className="text-white font-bold text-xs mb-1">
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          color: "white",
+          fontWeight: "bold",
+          fontSize: "11px",
+          marginBottom: "6px",
+          flexShrink: 0,
+        }}
+      >
         📊 ACTIVITY BREAKDOWN
-      </h2>
-      <div className="flex-1">
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="45%"
-              innerRadius={30}
-              outerRadius={50}
+              innerRadius={innerR}
+              outerRadius={outerR}
               paddingAngle={3}
               dataKey="value"
             >

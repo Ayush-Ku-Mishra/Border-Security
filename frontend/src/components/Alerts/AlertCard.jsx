@@ -25,21 +25,10 @@ const ACTIVITY_ICONS = {
 
 const reverseGeocode = async (lat, lng) => {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse` +
-        `?lat=${lat}&lng=${lng}&format=json`,
-    );
+    const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const res = await fetch(`${BASE}/detections/geocode?lat=${lat}&lng=${lng}`);
     const data = await res.json();
-    const a = data.address;
-    return (
-      a.village ||
-      a.town ||
-      a.suburb ||
-      a.county ||
-      a.state_district ||
-      a.state ||
-      "Border Zone"
-    );
+    return data.place || "Border Zone";
   } catch {
     return "Border Zone";
   }
