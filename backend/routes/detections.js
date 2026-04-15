@@ -2,7 +2,7 @@ import express from "express";
 import axios from "axios";
 import Detection from "../models/Detection.js";
 import { processAlert } from "../services/alertService.js";
-import { emitDetection } from "../services/socketService.js";
+import { emitDetection, emitClearAll } from "../services/socketService.js";
 
 const router = express.Router();
 const PYTHON_API = process.env.PYTHON_API || "http://localhost:8000";
@@ -115,6 +115,10 @@ router.patch("/:id/acknowledge", async (req, res) => {
 router.delete("/", async (req, res) => {
   try {
     await Detection.deleteMany({});
+
+    // Emit to all connected dashboards
+    emitClearAll();
+
     res.json({ success: true, message: "All detections cleared" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

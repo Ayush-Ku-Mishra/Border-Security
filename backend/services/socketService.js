@@ -50,3 +50,9 @@ export const emitSensorUpdate = (sensors) => {
     ioInstance.emit("sensor_update", sensors);
   }
 };
+
+export const emitClearAll = () => {
+  if (ioInstance) {
+    ioInstance.emit("clear_all");
+  }
+};

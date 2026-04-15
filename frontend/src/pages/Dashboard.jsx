@@ -39,7 +39,11 @@ const Dashboard = () => {
 
   const isMobile = useIsMobile();
 
-  const { isConnected, lastDetection: socketDetection } = useSocket();
+  const {
+    isConnected,
+    lastDetection: socketDetection,
+    clearSignal,
+  } = useSocket();
 
   useEffect(() => {
     const hasHighThreat = detections.some(
@@ -99,6 +103,15 @@ const Dashboard = () => {
       });
     }
   }, [socketDetection]);
+
+  useEffect(() => {
+    if (clearSignal === 0) return;
+    setDetections([]);
+    setLastDetection(null);
+    stopAlarm();
+    setAlarmOn(false);
+    toast.success("Cleared by operator");
+  }, [clearSignal]);
 
   const handleLiveDetect = async () => {
     setIsLoading(true);
@@ -665,6 +678,7 @@ const Dashboard = () => {
           overflow: "hidden",
           minHeight: 0,
           position: "relative",
+          maxHeight: "calc(100vh - 185px)",
         }}
       >
         {/* MAP TAB */}

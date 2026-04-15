@@ -7,10 +7,9 @@ export const useSocket = () => {
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastDetection, setLastDetection] = useState(null);
-  const [lastAlert, setLastAlert] = useState(null);
+  const [clearSignal, setClearSignal] = useState(0);
 
   useEffect(() => {
-    // Connect to Node.js server
     socketRef.current = io(SOCKET_URL);
 
     socketRef.current.on("connect", () => {
@@ -23,15 +22,15 @@ export const useSocket = () => {
       setIsConnected(false);
     });
 
-    // Listen for new detections
+    // New detection from any device
     socketRef.current.on("new_detection", (data) => {
       setLastDetection(data);
     });
 
-    // Listen for new alerts
-    socketRef.current.on("new_alert", (data) => {
-      console.log("⚠️ New alert:", data);
-      setLastAlert(data);
+    // Clear from any device
+    socketRef.current.on("clear_all", () => {
+      console.log("🗑 Clear signal received");
+      setClearSignal((prev) => prev + 1);
     });
 
     return () => {
@@ -50,7 +49,7 @@ export const useSocket = () => {
   return {
     isConnected,
     lastDetection,
-    lastAlert,
+    clearSignal,
     acknowledgeAlert,
     markFalseAlarm,
   };
