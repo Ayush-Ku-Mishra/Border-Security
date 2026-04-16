@@ -1,129 +1,102 @@
+import random
+import time
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-import asyncio
-import random
 
+# Make sure these files exist and are correct
 from simulator import run_scenario, get_sensor_status
-from signal_processor import FS
 
-# ─────────────────────────────────────────
-# CREATE FASTAPI APP
-# Same concept as Express.js app
-# ─────────────────────────────────────────
-app = FastAPI(title="Border Security API")
+# ----------------------------------------------------
+#  1. CREATE THE APP
+# ----------------------------------------------------
+app = FastAPI(title="Border Security Python API")
 
-# ─────────────────────────────────────────
-# CORS SETTINGS
-# Allow React frontend to call this API
-# Same concept as cors in Express.js
-# ─────────────────────────────────────────
+# ----------------------------------------------------
+#  2. ADD CORS MIDDLEWARE
+#  Allows any origin to call this API
+# ----------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = ["http://localhost:5173"],  # React vite port
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────
-# STORE RECENT DETECTIONS IN MEMORY
-# Later we will save to MongoDB
-# ─────────────────────────────────────────
+# In-memory storage for recent detections
 recent_detections = []
 
 
-# ─────────────────────────────────────────
-# HELPER - ADD TIMESTAMP AND ID
-# ─────────────────────────────────────────
-def format_detection(raw):
-    raw["id"]        = f"DET_{random.randint(10000,99999)}"
-    raw["timestamp"] = datetime.utcnow().isoformat() + "Z"
-    raw["status"]    = "new"
-    return raw
+# ----------------------------------------------------
+#  3. HELPER FUNCTION TO FORMAT DATA
+# ----------------------------------------------------
+def format_detection(raw_data):
+    """Adds a unique ID and timestamp to the raw detection data."""
+    unique_id = f"DET_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+    raw_data["id"] = unique_id
+    raw_data["timestamp"] = datetime.utcnow().isoformat() + "Z"
+    raw_data["status"] = "new"
+    return raw_data
 
 
-# ─────────────────────────────────────────
-# ROUTE 1: ROOT
-# Test if server is running
-# GET http://localhost:8000/
-# ─────────────────────────────────────────
+# ----------------------------------------------------
+#  4. DEFINE ALL API ROUTES
+# ----------------------------------------------------
+
+# THIS IS THE MISSING ROUTE
 @app.get("/")
-def root():
-    return {
-        "message" : "Border Security Python API is running",
-        "status"  : "ok"
-    }
+def get_root():
+    """Root endpoint to confirm the API is running."""
+    return {"message": "Border Security Python API is running", "status": "ok"}
 
 
-# ─────────────────────────────────────────
-# ROUTE 2: GET SINGLE DETECTION
-# Runs one simulation and returns result
-# GET http://localhost:8000/detect
-# ─────────────────────────────────────────
+@app.get("/health")
+def get_health():
+    """Health check endpoint for Render."""
+    return {"status": "healthy"}
+
+
 @app.get("/detect")
-def detect():
-    raw       = run_scenario()
-    detection = format_detection(raw)
+def get_detection():
+    """Generates a single, random detection scenario."""
+    raw_detection = run_scenario()
+    formatted_detection = format_detection(raw_detection)
 
-    # Keep only last 50 detections in memory
-    recent_detections.append(detection)
-    if len(recent_detections) > 50:
-        recent_detections.pop(0)
+    # Store in memory
+    recent_detections.insert(0, formatted_detection)
+    if len(recent_detections) > 100:
+        recent_detections.pop()
 
-    return detection
-
-
-# ─────────────────────────────────────────
-# ROUTE 3: GET ALL RECENT DETECTIONS
-# Returns last 50 detections
-# GET http://localhost:8000/detections
-# ─────────────────────────────────────────
-@app.get("/detections")
-def get_detections():
-    return {
-        "count"      : len(recent_detections),
-        "detections" : list(reversed(recent_detections))
-    }
+    return formatted_detection
 
 
-# ─────────────────────────────────────────
-# ROUTE 4: GET SENSOR STATUS
-# Returns all sensor node health info
-# GET http://localhost:8000/sensors
-# ─────────────────────────────────────────
 @app.get("/sensors")
-def get_sensors():
+def get_all_sensors():
+    """Returns the status of all sensor nodes."""
     return {
-        "count"   : 5,
-        "sensors" : get_sensor_status()
+        "count": 5,
+        "sensors": get_sensor_status(),
     }
 
 
-# ─────────────────────────────────────────
-# ROUTE 5: RUN SPECIFIC SCENARIO
-# 0 = Walker, 1 = Runner, 2 = Hiding
-# GET http://localhost:8000/detect/0
-# ─────────────────────────────────────────
+# This route is kept for backward compatibility but is now also random
 @app.get("/detect/{scenario_id}")
-def detect_scenario(scenario_id: int):
-    if scenario_id not in [0, 1, 2]:
-        return {"error": "scenario_id must be 0, 1 or 2"}
-
-    raw       = run_scenario(scenario_id)
-    detection = format_detection(raw)
-
-    recent_detections.append(detection)
-    if len(recent_detections) > 50:
-        recent_detections.pop(0)
-
-    return detection
+def get_detection_by_id(scenario_id: int):
+    """Generates a random detection, ignoring the scenario_id."""
+    return get_detection()
 
 
-# ─────────────────────────────────────────
-# ROUTE 6: CLEAR ALL DETECTIONS
-# DELETE http://localhost:8000/detections
-# ─────────────────────────────────────────
+@app.get("/detections")
+def get_all_detections():
+    """Returns all recent detections stored in memory."""
+    return {
+        "count": len(recent_detections),
+        "detections": recent_detections,
+    }
+
+
 @app.delete("/detections")
-def clear_detections():
+def clear_all_detections():
+    """Clears all detections from memory."""
     recent_detections.clear()
-    return {"message": "All detections cleared"}
+    return {"message": "All detections cleared successfully"}

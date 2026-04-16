@@ -80,13 +80,34 @@ const reverseGeocode = async (lat, lng) => {
   }
 };
 
+const getEmoji = (activity) => {
+  const map = {
+    Walking: "🚶",
+    Running: "🏃",
+    Hiding: "😮‍💨",
+    Crawling: "🪖",
+    Motorcycle: "🏍️",
+    Vehicle: "🚗",
+    Truck: "🚛",
+    "Large Animal": "🐄",
+    "Small Animal": "🐕",
+    Unknown: "❓",
+  };
+  return map[activity] || "❓";
+};
+
 // ─────────────────────────────────────────
 // BLINKING DETECTION ICON
 // High threat blinks faster
 // ─────────────────────────────────────────
-const createDetectionIcon = (threatLevel, isNew = false) => {
+const createDetectionIcon = (
+  threatLevel,
+  activity = "",
+  icon = "",
+  isNew = false,
+) => {
   const color = THREAT_COLORS[threatLevel] || "#ef4444";
-  const size = threatLevel >= 3 ? 26 : 20;
+  const size = threatLevel >= 3 ? 44 : 36;
   const animation =
     threatLevel >= 3
       ? "blink-fast 0.5s infinite"
@@ -94,19 +115,26 @@ const createDetectionIcon = (threatLevel, isNew = false) => {
         ? "blink-slow 1.2s infinite"
         : "none";
 
+  const emoji = icon || getEmoji(activity);
+
   return L.divIcon({
     className: "",
     html: `
       <div style="
         width          : ${size}px;
         height         : ${size}px;
-        background     : ${color};
-        border         : 3px solid white;
+        background     : ${color}22;
+        border         : 3px solid ${color};
         border-radius  : 50%;
-        box-shadow     : 0 0 15px ${color}, 0 0 30px ${color}55;
+        box-shadow     : 0 0 15px ${color}88;
         animation      : ${animation};
         cursor         : pointer;
-      "></div>
+        display        : flex;
+        align-items    : center;
+        justify-content: center;
+        font-size      : ${size * 0.5}px;
+        line-height    : 1;
+      ">${emoji}</div>
     `,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -303,6 +331,7 @@ const CompassRose = () => (
 // ─────────────────────────────────────────
 // SINGLE DETECTION MARKER
 // ─────────────────────────────────────────
+// In DetectionMarker component
 const DetectionMarker = ({ det, prevDet, isNew }) => {
   const [placeName, setPlaceName] = useState("Locating...");
 
@@ -319,10 +348,19 @@ const DetectionMarker = ({ det, prevDet, isNew }) => {
       )
     : null;
 
+  // ── FIX: Fallback chain for icon ──
+  const displayIcon =
+    det.icon && det.icon !== "❓" ? det.icon : getEmoji(det.activity);
+
   return (
     <Marker
       position={[det.location.lat, det.location.lng]}
-      icon={createDetectionIcon(det.threatLevel, isNew)}
+      icon={createDetectionIcon(
+        det.threatLevel,
+        det.activity,
+        displayIcon, // ← pass correct icon
+        isNew,
+      )}
     >
       <Popup minWidth={230}>
         <div style={{ fontFamily: "sans-serif", fontSize: "13px" }}>

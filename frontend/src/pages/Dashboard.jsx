@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import BorderMap from "../components/Map/BorderMap";
 import AlertFeed from "../components/Alerts/AlertFeed";
@@ -8,16 +8,12 @@ import { useSocket } from "../hooks/useSocket";
 import { startAlarm, stopAlarm, playBeep } from "../services/soundService";
 import {
   getDetections,
-  getLiveDetection,
   simulateDetections,
   getSensors,
   acknowledgeDetection,
   clearDetections,
 } from "../services/api";
 
-// ─────────────────────────────────────────
-// DETECT MOBILE
-// ─────────────────────────────────────────
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
   useEffect(() => {
@@ -36,7 +32,10 @@ const Dashboard = () => {
   const [autoMode, setAutoMode] = useState(false);
   const [alarmOn, setAlarmOn] = useState(false);
   const [mobileTab, setMobileTab] = useState("map");
+  const [clearLoading, setClearLoading] = useState(false);
 
+  // ── Use ref for auto interval ──
+  const autoRef = useRef(null);
   const isMobile = useIsMobile();
 
   const {
@@ -45,6 +44,9 @@ const Dashboard = () => {
     clearSignal,
   } = useSocket();
 
+  // ─────────────────────────────────────────
+  // ALARM
+  // ─────────────────────────────────────────
   useEffect(() => {
     const hasHighThreat = detections.some(
       (d) => d.threatLevel >= 3 && d.status !== "acknowledged",
@@ -58,6 +60,9 @@ const Dashboard = () => {
     }
   }, [detections, alarmOn]);
 
+  // ─────────────────────────────────────────
+  // LOAD DATA
+  // ─────────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
       const [detRes, senRes] = await Promise.all([
@@ -75,6 +80,9 @@ const Dashboard = () => {
     loadData();
   }, [loadData]);
 
+  // ─────────────────────────────────────────
+  // SOCKET DETECTION
+  // ─────────────────────────────────────────
   useEffect(() => {
     if (!socketDetection) return;
     setDetections((prev) => {
@@ -104,6 +112,9 @@ const Dashboard = () => {
     }
   }, [socketDetection]);
 
+  // ─────────────────────────────────────────
+  // CLEAR SIGNAL
+  // ─────────────────────────────────────────
   useEffect(() => {
     if (clearSignal === 0) return;
     setDetections([]);
@@ -113,36 +124,55 @@ const Dashboard = () => {
     toast.success("Cleared by operator");
   }, [clearSignal]);
 
-  const handleLiveDetect = async () => {
-    setIsLoading(true);
-    try {
-      const res = await getLiveDetection();
-      if (res.success) {
-        toast.success("Detection processed");
-        setLastDetection(res.detection);
-        await loadData();
-      }
-    } catch {
-      toast.error("Detection failed");
-    }
-    setIsLoading(false);
-  };
-
-  const handleSimulate = async () => {
+  // ─────────────────────────────────────────
+  // SIMULATE
+  // ─────────────────────────────────────────
+  const handleSimulate = useCallback(async () => {
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const res = await simulateDetections();
       if (res.success) {
-        toast.success(`${res.count} scenarios simulated`);
-        setLastDetection(res.detections[0]);
+        toast.success(`${res.count} detections added`);
+        if (res.detections?.length > 0) {
+          setLastDetection(res.detections[0]);
+        }
         await loadData();
       }
     } catch {
       toast.error("Simulation failed");
     }
     setIsLoading(false);
-  };
+  }, [isLoading, loadData]);
 
+  // ─────────────────────────────────────────
+  // AUTO MODE - useRef to avoid stale closure
+  // ─────────────────────────────────────────
+  useEffect(() => {
+    if (autoMode) {
+      // Run immediately
+      handleSimulate();
+      // Then every 10 seconds
+      autoRef.current = setInterval(() => {
+        handleSimulate();
+      }, 10000);
+    } else {
+      if (autoRef.current) {
+        clearInterval(autoRef.current);
+        autoRef.current = null;
+      }
+    }
+    return () => {
+      if (autoRef.current) {
+        clearInterval(autoRef.current);
+        autoRef.current = null;
+      }
+    };
+  }, [autoMode]); // Only depends on autoMode
+
+  // ─────────────────────────────────────────
+  // ACKNOWLEDGE
+  // ─────────────────────────────────────────
   const handleAcknowledge = async (id) => {
     try {
       await acknowledgeDetection(id, "Operator");
@@ -155,24 +185,23 @@ const Dashboard = () => {
     }
   };
 
+  // ─────────────────────────────────────────
+  // CLEAR
+  // ─────────────────────────────────────────
   const handleClear = async () => {
+    setClearLoading(true);
     try {
       await clearDetections();
       setDetections([]);
       setLastDetection(null);
       stopAlarm();
       setAlarmOn(false);
-      toast.success("Cleared");
+      toast.success("All detections cleared");
     } catch {
       toast.error("Failed to clear");
     }
+    setClearLoading(false);
   };
-
-  useEffect(() => {
-    if (!autoMode) return;
-    const interval = setInterval(handleLiveDetect, 5000);
-    return () => clearInterval(interval);
-  }, [autoMode]);
 
   const highThreats = detections.filter((d) => d.threatLevel >= 3).length;
   const motionCount = detections.filter((d) => d.isMotion).length;
@@ -192,7 +221,7 @@ const Dashboard = () => {
   });
 
   // ─────────────────────────────────────────
-  // DESKTOP LAYOUT - EXACTLY AS BEFORE
+  // DESKTOP
   // ─────────────────────────────────────────
   if (!isMobile) {
     return (
@@ -204,7 +233,6 @@ const Dashboard = () => {
           background: "#030712",
           display: "flex",
           flexDirection: "column",
-          minWidth: "320px",
         }}
       >
         <Toaster position="top-right" />
@@ -223,23 +251,12 @@ const Dashboard = () => {
             minHeight: "56px",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              flexShrink: 0,
-            }}
-          >
+          {/* Title */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "22px" }}>🛡️</span>
             <div>
               <div
-                style={{
-                  color: "white",
-                  fontWeight: "bold",
-                  fontSize: "13px",
-                  lineHeight: "1.3",
-                }}
+                style={{ color: "white", fontWeight: "bold", fontSize: "13px" }}
               >
                 BORDER SECURITY COMMAND CENTER
               </div>
@@ -249,45 +266,24 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "20px", flexShrink: 0 }}>
+          {/* Stats */}
+          <div style={{ display: "flex", gap: "20px" }}>
             {[
               { v: detections.length, l: "Total", c: "#f1f5f9" },
               { v: motionCount, l: "Motion", c: "#facc15" },
               { v: highThreats, l: "Threats", c: "#f87171" },
             ].map(({ v, l, c }) => (
               <div key={l} style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    color: c,
-                    fontSize: "20px",
-                    fontWeight: "bold",
-                    lineHeight: "1",
-                  }}
-                >
+                <div style={{ color: c, fontSize: "20px", fontWeight: "bold" }}>
                   {v}
                 </div>
-                <div
-                  style={{
-                    color: "#64748b",
-                    fontSize: "10px",
-                    marginTop: "2px",
-                  }}
-                >
-                  {l}
-                </div>
+                <div style={{ color: "#64748b", fontSize: "10px" }}>{l}</div>
               </div>
             ))}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              flexShrink: 0,
-              flexWrap: "nowrap",
-            }}
-          >
+          {/* Buttons */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             {alarmOn && (
               <div
                 style={{
@@ -298,6 +294,7 @@ const Dashboard = () => {
                 🔔 ALARM
               </div>
             )}
+            {/* Live indicator */}
             <div
               style={{
                 display: "flex",
@@ -308,7 +305,6 @@ const Dashboard = () => {
                 fontSize: "11px",
                 padding: "5px 10px",
                 borderRadius: "999px",
-                flexShrink: 0,
               }}
             >
               <div
@@ -321,50 +317,74 @@ const Dashboard = () => {
               />
               {isConnected ? "LIVE" : "OFFLINE"}
             </div>
+
+            {/* AUTO button */}
             <button
               onClick={() => setAutoMode((p) => !p)}
               style={btnStyle(autoMode ? "#15803d" : "#374151")}
             >
-              {autoMode ? "⏹ STOP" : "▶ AUTO"}
+              {autoMode ? "⏹ STOP AUTO" : "▶ AUTO"}
             </button>
-            <button
-              onClick={handleLiveDetect}
-              disabled={isLoading}
-              style={btnStyle("#1d4ed8", isLoading)}
-            >
-              {isLoading ? "..." : "⚡ DETECT"}
-            </button>
+
+            {/* SIMULATE button */}
             <button
               onClick={handleSimulate}
               disabled={isLoading}
               style={btnStyle("#6d28d9", isLoading)}
             >
-              🎭 SIMULATE
+              {isLoading ? "⏳ Loading..." : "🎭 SIMULATE"}
             </button>
-            <button onClick={handleClear} style={btnStyle("#991b1b")}>
-              🗑 CLEAR
+
+            {/* CLEAR button with loader */}
+            <button
+              onClick={handleClear}
+              disabled={clearLoading}
+              style={{
+                background: clearLoading ? "#6b7280" : "#991b1b",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                padding: "6px 14px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                cursor: clearLoading ? "not-allowed" : "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                opacity: clearLoading ? 0.7 : 1,
+                transition: "all 0.2s",
+              }}
+            >
+              {clearLoading ? (
+                <>
+                  <span
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      border: "2px solid #9ca3af",
+                      borderTopColor: "white",
+                      borderRadius: "50%",
+                      display: "inline-block",
+                      animation: "spin 0.6s linear infinite",
+                    }}
+                  />
+                  Clearing...
+                </>
+              ) : (
+                "🗑 CLEAR"
+              )}
             </button>
           </div>
         </div>
 
         {/* BODY */}
         <div
-          style={{
-            flex: 1,
-            display: "flex",
-            overflow: "hidden",
-            minHeight: 0,
-          }}
+          style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}
         >
           {/* MAP */}
-          <div
-            style={{
-              flex: 1,
-              padding: "8px",
-              minWidth: 0,
-              minHeight: 0,
-            }}
-          >
+          <div style={{ flex: 1, padding: "8px", minWidth: 0 }}>
             <div
               style={{
                 height: "100%",
@@ -387,7 +407,6 @@ const Dashboard = () => {
             style={{
               width: "290px",
               minWidth: "290px",
-              maxWidth: "290px",
               padding: "8px 8px 8px 0",
               display: "flex",
               flexDirection: "column",
@@ -396,17 +415,18 @@ const Dashboard = () => {
               overflow: "hidden",
             }}
           >
+            {/* Alerts */}
             <div
               style={{
                 background: "#0f172a",
                 borderRadius: "12px",
                 border: "1px solid #1e293b",
                 padding: "12px",
-                display: "flex",
-                flexDirection: "column",
                 flex: "1 1 0",
                 minHeight: 0,
                 overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
               <AlertFeed
@@ -414,6 +434,8 @@ const Dashboard = () => {
                 onAcknowledge={handleAcknowledge}
               />
             </div>
+
+            {/* Sensors */}
             <div
               style={{
                 background: "#0f172a",
@@ -425,6 +447,8 @@ const Dashboard = () => {
             >
               <SensorStatus sensors={sensors} />
             </div>
+
+            {/* Chart */}
             <div
               style={{
                 background: "#0f172a",
@@ -444,7 +468,7 @@ const Dashboard = () => {
   }
 
   // ─────────────────────────────────────────
-  // MOBILE LAYOUT
+  // MOBILE
   // ─────────────────────────────────────────
   return (
     <div
@@ -455,12 +479,11 @@ const Dashboard = () => {
         background: "#030712",
         display: "flex",
         flexDirection: "column",
-        maxHeight: "100svh",
       }}
     >
       <Toaster position="top-center" />
 
-      {/* MOBILE: APP NAME ROW */}
+      {/* Header */}
       <div
         style={{
           background: "#0f172a",
@@ -474,29 +497,15 @@ const Dashboard = () => {
       >
         <span style={{ fontSize: "22px" }}>🛡️</span>
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              color: "white",
-              fontWeight: "bold",
-              fontSize: "15px",
-              letterSpacing: "0.5px",
-            }}
-          >
+          <div style={{ color: "white", fontWeight: "bold", fontSize: "15px" }}>
             BORDER SECURITY
           </div>
-          <div
-            style={{
-              color: "#64748b",
-              fontSize: "11px",
-            }}
-          >
+          <div style={{ color: "#64748b", fontSize: "11px" }}>
             WiFi Movement Detection System
           </div>
         </div>
-        {/* Live indicator right side */}
         <div
           style={{
-            marginLeft: "auto",
             display: "flex",
             alignItems: "center",
             gap: "4px",
@@ -519,7 +528,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* MOBILE: COUNTS ROW */}
+      {/* Stats row */}
       <div
         style={{
           background: "#0f172a",
@@ -536,23 +545,10 @@ const Dashboard = () => {
           { v: highThreats, l: "Threats", c: "#f87171" },
         ].map(({ v, l, c }) => (
           <div key={l} style={{ textAlign: "center" }}>
-            <div
-              style={{
-                color: c,
-                fontSize: "18px",
-                fontWeight: "bold",
-              }}
-            >
+            <div style={{ color: c, fontSize: "18px", fontWeight: "bold" }}>
               {v}
             </div>
-            <div
-              style={{
-                color: "#64748b",
-                fontSize: "9px",
-              }}
-            >
-              {l}
-            </div>
+            <div style={{ color: "#64748b", fontSize: "9px" }}>{l}</div>
           </div>
         ))}
         {alarmOn && (
@@ -573,23 +569,17 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* MOBILE: BUTTONS ROW - horizontally scrollable */}
+      {/* Mobile buttons */}
       <div
         style={{
           background: "#0f172a",
           borderBottom: "1px solid #1e293b",
           flexShrink: 0,
           overflowX: "auto",
-          overflowY: "hidden",
           scrollbarWidth: "none",
-          msOverflowStyle: "none",
         }}
       >
-        <style>{`
-          .mobile-btn-row::-webkit-scrollbar { display: none; }
-        `}</style>
         <div
-          className="mobile-btn-row"
           style={{
             display: "flex",
             alignItems: "center",
@@ -616,25 +606,6 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={handleLiveDetect}
-            disabled={isLoading}
-            style={{
-              background: isLoading ? "#374151" : "#1d4ed8",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              padding: "6px 14px",
-              fontSize: "12px",
-              fontWeight: "bold",
-              cursor: isLoading ? "not-allowed" : "pointer",
-              whiteSpace: "nowrap",
-              opacity: isLoading ? 0.6 : 1,
-            }}
-          >
-            {isLoading ? "..." : "⚡ DETECT"}
-          </button>
-
-          <button
             onClick={handleSimulate}
             disabled={isLoading}
             style={{
@@ -650,46 +621,67 @@ const Dashboard = () => {
               opacity: isLoading ? 0.6 : 1,
             }}
           >
-            🎭 SIMULATE
+            {isLoading ? "⏳ Loading..." : "🎭 SIMULATE"}
           </button>
 
+          {/* CLEAR button with loader */}
           <button
             onClick={handleClear}
+            disabled={clearLoading}
             style={{
-              background: "#991b1b",
+              background: clearLoading ? "#6b7280" : "#991b1b",
               color: "white",
               border: "none",
               borderRadius: "8px",
               padding: "6px 14px",
               fontSize: "12px",
               fontWeight: "bold",
-              cursor: "pointer",
+              cursor: clearLoading ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              opacity: clearLoading ? 0.7 : 1,
+              transition: "all 0.2s",
             }}
           >
-            🗑 CLEAR
+            {clearLoading ? (
+              <>
+                <span
+                  style={{
+                    width: "10px",
+                    height: "10px",
+                    border: "2px solid #9ca3af",
+                    borderTopColor: "white",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                    animation: "spin 0.6s linear infinite",
+                  }}
+                />
+                Clearing...
+              </>
+            ) : (
+              "🗑 CLEAR"
+            )}
           </button>
         </div>
       </div>
 
-      {/* MOBILE: TAB CONTENT */}
+      {/* Tab content */}
       <div
         style={{
           flex: 1,
           overflow: "hidden",
           minHeight: 0,
-          maxHeight: "calc(100svh - 65px - 60px - 52px - 48px)",
           position: "relative",
         }}
       >
-        {/* MAP TAB */}
+        {/* Map */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             display: mobileTab === "map" ? "flex" : "none",
             padding: "8px",
           }}
@@ -701,7 +693,6 @@ const Dashboard = () => {
               borderRadius: "12px",
               border: "1px solid #1e293b",
               overflow: "hidden",
-              maxHeight: "100%",
             }}
           >
             <BorderMap
@@ -712,7 +703,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ALERTS TAB */}
+        {/* Alerts */}
         <div
           style={{
             position: "absolute",
@@ -732,7 +723,6 @@ const Dashboard = () => {
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
-              minHeight: 0,
             }}
           >
             <AlertFeed
@@ -742,7 +732,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* NODES TAB */}
+        {/* Nodes */}
         <div
           style={{
             position: "absolute",
@@ -764,7 +754,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ACTIVITY TAB */}
+        {/* Activity */}
         <div
           style={{
             position: "absolute",
@@ -787,7 +777,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* MOBILE: BOTTOM NAV */}
+      {/* Bottom nav */}
       <nav
         style={{
           display: "grid",
@@ -796,12 +786,6 @@ const Dashboard = () => {
           borderTop: "2px solid #1e293b",
           flexShrink: 0,
           height: "65px",
-          minHeight: "65px",
-          maxHeight: "65px",
-          width: "100%",
-          position: "sticky",
-          bottom: 0,
-          zIndex: 9999,
         }}
       >
         {[
@@ -828,36 +812,21 @@ const Dashboard = () => {
               justifyContent: "center",
               gap: "3px",
               padding: "8px 4px",
-              width: "100%",
-              height: "100%",
+              position: "relative",
             }}
           >
-            <span
-              style={{
-                fontSize: "20px",
-                lineHeight: "1",
-              }}
-            >
-              {icon}
-            </span>
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: "600",
-                lineHeight: "1",
-              }}
-            >
-              {label}
-            </span>
+            <span style={{ fontSize: "20px", lineHeight: "1" }}>{icon}</span>
+            <span style={{ fontSize: "10px", fontWeight: "600" }}>{label}</span>
             {key === "alerts" && detections.length > 0 && (
               <span
                 style={{
                   position: "absolute",
-                  top: "6px",
+                  top: "4px",
+                  right: "8px",
                   background: "#dc2626",
                   color: "white",
                   fontSize: "8px",
-                  padding: "1px 5px",
+                  padding: "1px 4px",
                   borderRadius: "999px",
                   fontWeight: "bold",
                 }}

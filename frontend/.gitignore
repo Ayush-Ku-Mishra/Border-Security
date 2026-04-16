@@ -10,7 +10,6 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-*.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +21,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
+# Keep .env.local out of git
+.env.local
+# Keep .env out of git (has real URLs)
+.env
+# Keep production env out of git
+.env.production
